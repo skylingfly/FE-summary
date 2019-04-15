@@ -1,6 +1,6 @@
 ### FE materials:
-1.  增加倍速播放音频组件
-
+1. 增加倍速播放音频组件
+2. add watch
 
 #### targets:
 + 性能优化

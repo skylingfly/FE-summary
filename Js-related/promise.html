@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>手写promise</title>
+</head>
+<body>
+
+</body>
+<script type="text/javascript">
+	const PENDING = 'pending';
+	const RESOLVED = 'resolved';
+	const REJECTED = 'rejected'
+	function Spromise(exector) {
+		this.status = PENDING //状态
+		this.cbs = [] // {resolved(){}, rejected()}
+		this.data = undefined // 保留resolve(xxx) 
+		const _this = this
+
+		function resolve(val) {
+			if (_this.status !== PENDING) return
+			_this.status = RESOLVED
+			_this.data = val
+			if (_this.cbs.length > 0){
+				setTimeout(()=>{ // 放到异步队列里面执行
+					_this.cbs.forEach(v => {
+					v.onFulfilled(val)
+			 		})}
+				)
+			}
+		}
+
+		function reject(err) {
+			if(_this.status !== PENDING) return
+			_this.status = REJECTED
+			_this.data = err
+			if (_this.cbs.length > 0){
+				setTimeout(() => {
+					_this.cbs.forEach(v => {
+					v.onRejected(err)
+			 	})})
+			}
+		}
+
+
+		//执行函数
+		try{
+			exector(resolve, reject)
+		}catch(err) {
+			reject(err)
+		}
+		
+
+	}
+
+	// 成功回调 返回new promise对象
+	Spromise.prototype.then = function(onFulfilled, onRejected){
+		// 异常穿透
+		onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : val => val
+
+		onRejected = typeof onRejected === 'function' ? onRejected : err => {
+			throw err
+		}
+
+		const _this = this
+
+		return new Spromise((resolve, reject) => {
+			// 更改状态
+			function handleStatus(cb) {
+				try{
+					// res是否为Spromise实例, then中resolve 成功与失败
+					const value = cb(_this.data)
+					if(value instanceof Spromise) {
+						value.then(resolve, reject)
+					} else {
+						resolve(value)
+					}
+				} catch(err) {
+					reject(err)
+				}
+			}
+
+
+			if(this.status === PENDING){
+			this.cbs.push({
+				onFulfilled(val) {
+					handleStatus(onFulfilled)
+				}, 
+				onRejected(reason) {
+					handleStatus(onRejected)
+				}
+			})
+			} else if( this.status === RESOLVED) {
+				setTimeout(() => 
+					{	
+						handleStatus(onFulfilled)
+					})
+			} else { // onrejected
+				setTimeout(() => 
+					{	
+						handleStatus(onRejected)
+						
+					})
+			}
+
+		})
+
+		
+	}
+
+	Spromise.prototype.catch = function (cb) {
+		return this.then(undefined, cb)
+	}
+
+	Spromise.prototype.reject = function (err) {
+		return new Spromise((res, rej) => rej(err))
+	}
+
+	Spromise.prototype.resolve = function (val) {
+		return new Spromise((res, rej) => {
+			if (val instanceof Spromise) {
+				val.then(res, rej)
+			} else {
+				res(val)
+			}
+		})
+	}
+
+
+	// demo测试
+	const p1 = new Spromise((res, rej) => {
+		setTimeout(() => {
+			// res('success')
+			rej('fail')
+			console.log('开始改状态')
+		},1000)
+	})
+	p1
+	.then(val => {
+		console.log(val); 
+		// return val
+	}, err => {
+		console.log(err,'bbb')
+		throw err
+	})
+	.then(val => console.log('haha', val))
+	.catch(err => console.log('err', err))
+</script>
+</html>
